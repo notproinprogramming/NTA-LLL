@@ -1,4 +1,5 @@
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -74,14 +75,34 @@ static Matrix random_full_rank(int n, int range, std::mt19937& rng) {
   }
 }
 
+// Виводить матрицю у потік - рядки через пробіл, один рядок матриці = один рядок файлу
+static void write_matrix(std::ostream& out, const Matrix& M) {
+  for (const auto& row : M) {
+    for (size_t j = 0; j < row.size(); ++j) {
+      if (j) out << " ";
+      out << (int)row[j];
+    }
+    out << "\n";
+  }
+}
+
 int main() {
   const int N_MATRICES = 50;
   const int N = 30;
   const int RANGE = 10;  // елементи з [-10, 10]
   const double DELTAS[] = {0.50, 0.75, 0.90, 0.95, 0.99};
   const int N_DELTAS = (int)(sizeof(DELTAS) / sizeof(DELTAS[0]));
+  const char* OUT_FILE = "results.txt";
 
   std::mt19937 rng(42);
+
+  std::ofstream fout(OUT_FILE);
+  if (!fout) {
+    std::cerr << "Не вдалося відкрити " << OUT_FILE << "\n";
+    return 1;
+  }
+
+  fout << std::fixed << std::setprecision(4);
 
   std::cout << std::fixed << std::setprecision(4);
   std::cout << std::setw(4) << "mat" << std::setw(6) << "delta" << std::setw(10) << "time(ms)" << std::setw(8) << "swaps" << std::setw(12)
@@ -91,6 +112,11 @@ int main() {
 
   for (int mi = 0; mi < N_MATRICES; ++mi) {
     Matrix B = random_full_rank(N, RANGE, rng);
+
+    // записуємо вхідну матрицю один раз на початку блоку
+    fout << "=== matrix " << (mi + 1) << " ===\n";
+    write_matrix(fout, B);
+    fout << "\n";
 
     for (int di = 0; di < N_DELTAS; ++di) {
       double delta = DELTAS[di];
@@ -105,11 +131,16 @@ int main() {
 
         std::cout << std::setw(4) << (mi + 1) << std::setw(6) << delta << std::setw(10) << r.time_ms << std::setw(8) << r.swaps << std::setw(12) << h
                   << std::setw(14) << nb1 << "\n";
+
+        fout << "--- delta=" << delta << "  time=" << r.time_ms << "ms"
+             << "  swaps=" << r.swaps << "  hadamard=" << h << "  ||b1||=" << nb1 << " ---\n";
+        write_matrix(fout, r.basis);
+        fout << "\n";
       } catch (const std::exception& e) {
         std::cerr << "mat=" << (mi + 1) << " delta=" << delta << " error: " << e.what() << "\n";
       }
     }
   }
-
+  std::cout << "\nРезультати записано у " << OUT_FILE << "\n";
   return 0;
 }
